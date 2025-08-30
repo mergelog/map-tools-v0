@@ -1,10 +1,12 @@
 {
-  "name": "map-tools-v1",
+  "name": "map-tools-v0",
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "build:pages": "ng build --base-href /map-tools-v0/",
+    "deploy:pages": "yarn run build:pages && rm -rf docs/* && cp -r dist/map-tools-v1/browser/* docs/ && cp docs/index.html docs/404.html",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },

@@ -55,6 +55,24 @@ ng build
 
 This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
 
+## GitHub Pages
+
+To publish at `https://mergelog.github.io/map-tools-v0/`:
+
+- Build with the repository base path and copy output to `docs/`:
+
+  ```bash
+  yarn deploy:pages
+  ```
+
+- On GitHub, open your repository settings:
+  - Settings → Pages → Source: “Deploy from a branch”
+  - Branch: `main` and Folder: `/docs`
+
+Notes:
+- The build uses `--base-href /map-tools-v0/`. If your repository name or Pages URL differs, change this base in `package.json` script `build:pages` accordingly.
+- For SPA deep links to work on Pages, `404.html` is created as a copy of `index.html`.
+
 ## Running unit tests
 
 To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
