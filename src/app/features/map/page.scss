@@ -36,7 +36,7 @@
 
 /* 右上HUD（緯度経度・住所・距離・ETAパネル） */
 .hud-tr {
-  right: 12px;
+  right: 60px; /* GitHubボタンの分だけ余白 */
   top: 12px;
 }
 
@@ -143,6 +143,38 @@
   border-radius: 6px;
   z-index: 6000;
   font-size: 13px;
+}
+
+/* GitHub リンクボタン（右上固定） */
+.github-link {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  text-decoration: none;
+  /* ボーダーを外し、ごく薄いアウトラインをボックスシャドウで再現 */
+  border: none;
+  box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.14), 0 1px 3px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(2px);
+  z-index: 7000;
+  transition: background 120ms ease;
+}
+
+.github-link:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.github-link .icon {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
 }
 
 /* Leafletデフォルトの帰属（現在は使用しないが残しておく） */
