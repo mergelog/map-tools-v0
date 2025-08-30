@@ -1,0 +1,5 @@
+# Keep only documentation (e.g., Markdown)
+*
+!.gitignore
+!*.md
+!**/*.md
