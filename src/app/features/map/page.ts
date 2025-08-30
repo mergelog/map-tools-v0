@@ -9,6 +9,10 @@ import { CurrentAddressStore } from '../../core/stores/current-address.store';
 import { CurrentPositionStore } from '../../core/stores/current-position.store';
 import { RouteRepository, LatLng } from '../../core/repositories/route-repository';
 import { GeocodeRepository } from '../../core/repositories/geocode-repository';
+import { bearing, pathLength } from '../../shared/utils/geo';
+import { calcEtaSeconds } from '../../shared/utils/time';
+import { createCarIcon, createMarkerIcon } from './utils/icon-factory';
+import { RoutePlayerService } from './services/route-player.service';
 import * as L from 'leaflet';
 import 'leaflet-routing-machine';
 
@@ -35,6 +39,8 @@ export class MapPage implements OnInit, OnDestroy {
   private readonly repo = inject(RouteRepository);
   /** 逆ジオコーディング用リポジトリ（Nominatim） */
   private readonly geocode = inject(GeocodeRepository);
+  /** 走行プレイヤー（rAF駆動） */
+  private readonly player = inject(RoutePlayerService);
   /** クリックで指定された2点（出発→到着） */
   private clickPoints: LatLng[] = [];
   /** クリック点用のLeafletマーカー */
@@ -43,16 +49,9 @@ export class MapPage implements OnInit, OnDestroy {
   private routeLine: L.Polyline | null = null;
   /** 車マーカー（SVGのdivIcon） */
   private carMarker: L.Marker | null = null;
-  /** requestAnimationFrameのハンドル */
-  private animHandle: number | null = null; // rAF id
-  private startTime = 0;
-  private lastTime = 0;
   /** ルート座標列 */
   private path: LatLng[] = [];
-  /** 現在のセグメントインデックス（path[i]→path[i+1]） */
-  private segIndex = 0; // current segment index
-  /** 現在セグメント内の進捗[m] */
-  private segProgress = 0; // meters progressed on current segment
+  private posSub: any;
   /** 速度[km/h]（UIで調整可能） */
   protected speedKmH = signal(60); // 20–180 km/h
   /** 速度[m/s] のcomputed */
@@ -191,7 +190,7 @@ export class MapPage implements OnInit, OnDestroy {
     if (this.running() || !this.hasRoute()) return;
     this.running.set(true);
     this.showStart.set(false);
-    this.startAnim();
+    this.startPlayer();
   }
 
   /**
@@ -237,7 +236,7 @@ export class MapPage implements OnInit, OnDestroy {
         this.lookupEndpointsAddresses(a, b);
         // ルート準備完了後に自動走行開始
         this.running.set(true);
-        this.startAnim();
+        this.startPlayer();
         this.showStart.set(false);
       } catch (err) {
         console.error(err);
@@ -258,30 +257,13 @@ export class MapPage implements OnInit, OnDestroy {
    */
   private addMarker(p: LatLng) {
     const type = this.clickPoints.length === 0 ? 'start' : 'end';
-    const icon = this.getMarkerIcon(type);
+    const icon = createMarkerIcon(type);
     const m = L.marker([p.lat, p.lng], { icon });
     m.addTo(this.map);
     this.markers.push(m);
   }
 
-  /**
-   * マーカーアイコン生成
-   *
-   * 処理概要:
-   * - public/svg 配下の start/end 用アイコンを `<img>` で読み込み
-   * - `L.divIcon` を返却（位置合わせのため iconAnchor を設定）
-   */
-  private getMarkerIcon(type: 'start' | 'end' | 'point' = 'point') {
-    // ベース相対パス（GitHub Pages のサブパス公開に対応）
-    const src = type === 'start' ? 'svg/marker-start.svg' : type === 'end' ? 'svg/marker-end.svg' : 'svg/marker-start.svg';
-    const html = `<img class="marker-svg" src="${src}" width="28" height="36" alt="marker" />`;
-    return L.divIcon({
-      className: 'marker-icon',
-      html,
-      iconSize: [28, 36],
-      iconAnchor: [14, 34]
-    });
-  }
+  // マーカーアイコン生成は icon-factory に委譲
 
   /**
    * クリック点（start/end）のマーカーを全削除
@@ -311,13 +293,7 @@ export class MapPage implements OnInit, OnDestroy {
     this.path = coords;
     this.routeLine = L.polyline(coords, MapPage.POLYLINE).addTo(this.map);
     // 総距離を計算
-    let meters = 0;
-    for (let i = 0; i < coords.length - 1; i++) {
-      meters += L.latLng(coords[i].lat, coords[i].lng).distanceTo(
-        L.latLng(coords[i + 1].lat, coords[i + 1].lng)
-      );
-    }
-    this.totalMeters.set(Math.round(meters));
+    this.totalMeters.set(Math.round(pathLength(coords)));
     this.resetCar();
   }
 
@@ -335,8 +311,8 @@ export class MapPage implements OnInit, OnDestroy {
     if (this.carMarker) this.carMarker.remove();
     this.carMarker = null;
     this.path = [];
-    this.segIndex = 0;
-    this.segProgress = 0;
+    if (this.posSub) { this.posSub.unsubscribe?.(); this.posSub = null; }
+    this.player.stop();
     this.hasRoute.set(false);
     this.hudLatLng.set(null);
     this.startAddress.set('');
@@ -361,18 +337,7 @@ export class MapPage implements OnInit, OnDestroy {
     if (!this.path.length) return;
     if (this.carMarker) this.carMarker.remove();
 
-    const iconHtml = `
-      <div class="car-inner" style="will-change: transform;">
-        <img src="svg/car.svg" width="48" height="48" alt="car" />
-      </div>`;
-
-    const icon = L.divIcon({
-      className: 'car-icon',
-      html: iconHtml,
-      iconSize: [48, 48],
-      iconAnchor: [24, 24]
-    });
-
+    const icon = createCarIcon();
     this.carMarker = L.marker([this.path[0].lat, this.path[0].lng], { icon, zIndexOffset: 1000 }).addTo(this.map);
   }
 
@@ -383,9 +348,7 @@ export class MapPage implements OnInit, OnDestroy {
    * - `requestAnimationFrame` でループを張り、毎フレーム `advance()` を呼ぶ
    * - 外部で running=false になったら早期return
    */
-  private startAnim() {
-    if (!this.path.length) return;
-    this.startTime = performance.now();
+  private startPlayer() {
     // 走行開始時に最大ズームで車位置へ寄せる（followが有効な場合）
     try {
       if (this.follow()) {
@@ -396,15 +359,37 @@ export class MapPage implements OnInit, OnDestroy {
         this.map.setView(ll, maxZ, { animate: true });
       }
     } catch {}
-    this.lastTime = this.startTime;
-    const step = (t: number) => {
-      if (!this.running()) return; // 外部で停止された場合
-      const dt = Math.max(0, t - this.lastTime) / 1000; // 経過秒
-      this.lastTime = t;
-      this.advance(dt);
-      this.animHandle = requestAnimationFrame(step);
-    };
-    this.animHandle = requestAnimationFrame(step);
+    this.player.setPath(this.path);
+    this.posSub = this.player.pos$.subscribe((u) => {
+      if (!this.carMarker) return;
+      this.carMarker.setLatLng([u.pos.lat, u.pos.lng]);
+      const el = this.carMarker.getElement() as HTMLElement | null;
+      const inner = el?.querySelector('.car-inner') as HTMLElement | null;
+      if (inner) {
+        const brg = bearing(u.prev, u.next);
+        inner.style.transformOrigin = 'center center';
+        const offset = -90;
+        let heading = (brg + offset) % 360;
+        if (heading < 0) heading += 360;
+        let angle = heading;
+        let flipX = false;
+        if (angle > 90 && angle < 270) {
+          angle -= 180;
+          flipX = true;
+        }
+        inner.style.transform = `rotate(${angle}deg)${flipX ? ' scaleX(-1)' : ''}`;
+      }
+      if (this.running()) {
+        this.hudLatLng.set(u.pos);
+        this.currentPositionStore.push(u.pos.lat, u.pos.lng);
+        this.maybeUpdateEta();
+        if (this.follow()) {
+          this.map.setView([u.pos.lat, u.pos.lng], this.map.getZoom(), { animate: false });
+        }
+        this.currentAddressStore.pushLatLng(u.pos.lat, u.pos.lng);
+      }
+    });
+    this.player.start(() => this.speedMps());
   }
 
   /**
@@ -414,8 +399,7 @@ export class MapPage implements OnInit, OnDestroy {
    * - `cancelAnimationFrame` でループ停止
    */
   private stopAnim() {
-    if (this.animHandle) cancelAnimationFrame(this.animHandle);
-    this.animHandle = null;
+    this.player.stop();
   }
 
   /**
@@ -432,46 +416,7 @@ export class MapPage implements OnInit, OnDestroy {
    * - 入力: dt（経過秒）
    * - 副作用: segProgress/segIndex の更新、車位置の更新
    */
-  private advance(dt: number) {
-    if (!this.carMarker || this.path.length < 2) return;
-    let remaining = this.speedMps() * dt; // 進む距離[m]
-
-    while (remaining > 0 && this.segIndex < this.path.length - 1) {
-      const a = this.path[this.segIndex];
-      const b = this.path[this.segIndex + 1];
-      const A = L.latLng(a.lat, a.lng);
-      const B = L.latLng(b.lat, b.lng);
-      const segLen = A.distanceTo(B);
-
-      const distLeft = segLen - this.segProgress;
-      if (remaining < distLeft) {
-        this.segProgress += remaining;
-        remaining = 0;
-        const ratio = this.segProgress / segLen;
-        const pos = this.lerp(a, b, ratio);
-        this.updateCar(pos, a, b);
-      } else {
-        // 次のセグメントへ
-        remaining -= distLeft;
-        this.segIndex++;
-        this.segProgress = 0;
-        this.updateCar(b, a, b);
-      }
-    }
-
-    if (this.segIndex >= this.path.length - 1) {
-      // 到着（到着地点で一度だけグローバルの位置・住所を更新）
-      try {
-        const finalPos = this.carMarker
-          ? this.carMarker.getLatLng()
-          : L.latLng(this.path[this.path.length - 1].lat, this.path[this.path.length - 1].lng);
-        this.currentPositionStore.push(finalPos.lat, finalPos.lng);
-        this.currentAddressStore.updateOnceNow(finalPos.lat, finalPos.lng);
-      } catch {}
-      this.running.set(false);
-      this.stopAnim();
-    }
-  }
+  // advance は RoutePlayerService に委譲
 
   /**
    * 車の座標/向き更新
@@ -483,65 +428,13 @@ export class MapPage implements OnInit, OnDestroy {
    *    180°戻した上で左右反転（scaleX）を併用
    * 4) running中はHUDに現在位置を反映、追従ONなら map.setView で中央維持
    */
-  private updateCar(pos: LatLng, prev: LatLng, next: LatLng) {
-    if (!this.carMarker) return;
-    this.carMarker.setLatLng([pos.lat, pos.lng]);
-    const bearing = this.computeBearing(prev, next);
-    const el = this.carMarker.getElement() as HTMLElement | null;
-    const inner = el?.querySelector('.car-inner') as HTMLElement | null;
-    if (inner) {
-      inner.style.transformOrigin = 'center center';
-      const offset = -90; // 右向き基準のSVGを北向きに補正
-      let heading = (bearing + offset) % 360;
-      if (heading < 0) heading += 360;
-      let angle = heading;
-      let flipX = false;
-      if (angle > 90 && angle < 270) {
-        angle -= 180; // 回転角を±90°内に正規化
-        flipX = true; // 左右反転で見た目の上方向を維持
-      }
-      inner.style.transform = `rotate(${angle}deg)${flipX ? ' scaleX(-1)' : ''}`;
-    }
-
-    // 走行中はHUD（現在位置）を更新
-    if (this.running()) {
-      this.hudLatLng.set(pos);
-      // グローバルにも現在位置を保持
-      this.currentPositionStore.push(pos.lat, pos.lng);
-      this.maybeUpdateEta();
-      if (this.follow()) {
-        // 現在のズームを維持したまま車を画面中央へ（ユーザードラッグ中は抑止）
-        this.map.setView([pos.lat, pos.lng], this.map.getZoom(), { animate: false });
-      }
-      // 現在地（高頻度）をグローバルストアへ送る（ストア側で2秒毎に逆ジオ）
-      this.currentAddressStore.pushLatLng(pos.lat, pos.lng);
-    }
-  }
+  // 車更新は startPlayer の購読内で実施
 
   /**
    * 線形補間
    * - a→b の途中 t(0..1) における座標を返す
    */
-  private lerp(a: LatLng, b: LatLng, t: number): LatLng {
-    return { lat: a.lat + (b.lat - a.lat) * t, lng: a.lng + (b.lng - a.lng) * t };
-  }
-
-  /**
-   * 方位角の算出
-   * - 北=0°, 東=90° の右回り角度を返す
-   * - 地球座標をラジアンに変換して計算
-   */
-  private computeBearing(a: LatLng, b: LatLng): number {
-    const toRad = (d: number) => (d * Math.PI) / 180;
-    const toDeg = (r: number) => (r * 180) / Math.PI;
-    const φ1 = toRad(a.lat);
-    const φ2 = toRad(b.lat);
-    const λ1 = toRad(a.lng);
-    const λ2 = toRad(b.lng);
-    const y = Math.sin(λ2 - λ1) * Math.cos(φ2);
-    const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(λ2 - λ1);
-    return (toDeg(Math.atan2(y, x)) + 360) % 360;
-  }
+  // lerp/bearing は shared/utils/geo に移動
 
   /**
    * 表示域フィット
@@ -605,13 +498,14 @@ export class MapPage implements OnInit, OnDestroy {
     const now = performance.now();
     if (now - this.lastEtaAt < MapPage.ETA_THROTTLE_MS) return; // throttle updates
     this.lastEtaAt = now;
-    const remaining = this.computeRemainingMeters();
+    const remaining = this.player.remainingMeters();
     const speed = this.speedMps();
     if (speed <= 0 || !isFinite(remaining)) {
       this.etaJst.set('');
       return;
     }
-    const seconds = remaining / speed;
+    const seconds = calcEtaSeconds(remaining, speed);
+    if (seconds == null) { this.etaJst.set(''); return; }
     const etaDate = new Date(Date.now() + seconds * 1000);
     const fmt = new Intl.DateTimeFormat('ja-JP', {
       timeZone: 'Asia/Tokyo',
@@ -630,23 +524,7 @@ export class MapPage implements OnInit, OnDestroy {
    * 残距離計算
    * - 現在セグメントの残り + 以降のセグメント長の合計をメートルで返す
    */
-  private computeRemainingMeters(): number {
-    if (!this.path.length) return NaN;
-    let meters = 0;
-    const i = this.segIndex;
-    if (i < this.path.length - 1) {
-      const a = this.path[i];
-      const b = this.path[i + 1];
-      const segLen = L.latLng(a.lat, a.lng).distanceTo(L.latLng(b.lat, b.lng));
-      meters += Math.max(0, segLen - this.segProgress);
-      for (let j = i + 1; j < this.path.length - 1; j++) {
-        const p = this.path[j];
-        const q = this.path[j + 1];
-        meters += L.latLng(p.lat, p.lng).distanceTo(L.latLng(q.lat, q.lng));
-      }
-    }
-    return meters;
-  }
+  // 残距離計算は RoutePlayerService に委譲
 
   /**
    * 簡易通知の表示
