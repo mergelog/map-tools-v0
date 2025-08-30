@@ -272,7 +272,8 @@ export class MapPage implements OnInit, OnDestroy {
    * - `L.divIcon` を返却（位置合わせのため iconAnchor を設定）
    */
   private getMarkerIcon(type: 'start' | 'end' | 'point' = 'point') {
-    const src = type === 'start' ? '/svg/marker-start.svg' : type === 'end' ? '/svg/marker-end.svg' : '/svg/marker-start.svg';
+    // ベース相対パス（GitHub Pages のサブパス公開に対応）
+    const src = type === 'start' ? 'svg/marker-start.svg' : type === 'end' ? 'svg/marker-end.svg' : 'svg/marker-start.svg';
     const html = `<img class="marker-svg" src="${src}" width="28" height="36" alt="marker" />`;
     return L.divIcon({
       className: 'marker-icon',
@@ -362,7 +363,7 @@ export class MapPage implements OnInit, OnDestroy {
 
     const iconHtml = `
       <div class="car-inner" style="will-change: transform;">
-        <img src="/svg/car.svg" width="48" height="48" alt="car" />
+        <img src="svg/car.svg" width="48" height="48" alt="car" />
       </div>`;
 
     const icon = L.divIcon({
