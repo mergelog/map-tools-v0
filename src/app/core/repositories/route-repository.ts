@@ -7,36 +7,47 @@ export type LatLng = { lat: number; lng: number };
 
 @Injectable({ providedIn: 'root' })
 export class RouteRepository {
-  private router: any;
+  private readonly endpoints = [
+    'https://router.project-osrm.org/route/v1',
+    // Fallback (FOSSGIS)
+    'https://routing.openstreetmap.de/routed-car/route/v1'
+  ];
 
   constructor() {
-    // Use OSRM public demo server via LRM
-    // Note: for production, consider hosting your own OSRM backend
-    this.router = L?.Routing?.osrmv1
-      ? L.Routing.osrmv1({
-          serviceUrl: 'https://router.project-osrm.org/route/v1',
-          profile: 'driving',
-          useHints: false
-        })
-      : null;
+    // nothing to initialize eagerly
   }
 
   async getRouteCoords(start: LatLng, end: LatLng): Promise<LatLng[]> {
-    if (!this.router) {
-      throw new Error('Routing engine not available');
-    }
-    return new Promise((resolve, reject) => {
-      const waypoints = [
-        { latLng: L.latLng(start.lat, start.lng) },
-        { latLng: L.latLng(end.lat, end.lng) }
-      ];
-      this.router.route(waypoints, (err: any, routes: any[]) => {
-        if (err) return reject(err);
-        const r = routes?.[0];
-        if (!r?.coordinates) return reject(new Error('No route found'));
-        const coords: LatLng[] = r.coordinates.map((c: any) => ({ lat: c.lat, lng: c.lng }));
-        resolve(coords);
+    const waypoints = [
+      { latLng: L.latLng(start.lat, start.lng) },
+      { latLng: L.latLng(end.lat, end.lng) }
+    ];
+
+    const tryEndpoint = (idx: number): Promise<LatLng[]> => {
+      if (!L?.Routing?.osrmv1) return Promise.reject(new Error('Routing engine not available'));
+      if (idx >= this.endpoints.length) return Promise.reject(new Error('All routers failed'));
+      const serviceUrl = this.endpoints[idx];
+      const router = L.Routing.osrmv1({
+        serviceUrl,
+        profile: 'driving',
+        useHints: false,
+        timeout: 15000
+      } as any);
+      return new Promise<LatLng[]>((resolve, reject) => {
+        const anyRouter: any = router as any;
+        anyRouter.route(waypoints, (err: any, routes: any[]) => {
+          if (err || !routes?.length || !routes[0]?.coordinates) {
+            // 次のエンドポイントで再試行（コールバックは void を返す）
+            tryEndpoint(idx + 1).then(resolve).catch(reject);
+            return;
+          }
+          const r = routes[0];
+          const coords: LatLng[] = r.coordinates.map((c: any) => ({ lat: c.lat, lng: c.lng }));
+          resolve(coords);
+        });
       });
-    });
+    };
+
+    return tryEndpoint(0);
   }
 }
