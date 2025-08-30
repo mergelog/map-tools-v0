@@ -1,0 +1,14 @@
+/* Global styles */
+@import 'leaflet/dist/leaflet.css';
+@import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
+html, body, app-root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+.leaflet-container {
+  font: inherit;
+}

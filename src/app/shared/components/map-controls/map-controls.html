@@ -1,0 +1,18 @@
+<div class="speed-control">
+  <label>速度: <strong>{{ speedKmH }}</strong> km/h</label>
+  <input type="range" min="20" max="180" step="1" [value]="speedKmH" (input)="onSpeed($event)" />
+  </div>
+
+<div class="buttons">
+  @if (running) {
+    <button type="button" (click)="stop.emit()" aria-label="stop running">stop</button>
+  }
+  @if (!running && hasRoute && showStart) {
+    <button type="button" (click)="start.emit()" aria-label="start running">start</button>
+  }
+  <button type="button" (click)="toggleFollow.emit()" [class.active]="follow" aria-pressed="{{ follow }}">follow</button>
+  <button type="button" (click)="clear.emit()" [disabled]="busy" aria-label="clear route">clear</button>
+</div>
+<div class="osm-attr">
+  © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors
+</div>

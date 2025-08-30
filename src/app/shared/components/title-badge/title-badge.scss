@@ -1,0 +1,17 @@
+.title-badge {
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.title-badge.compact {
+  padding: 4px 8px;
+  border-radius: 5px;
+  font-weight: 500;
+}
+

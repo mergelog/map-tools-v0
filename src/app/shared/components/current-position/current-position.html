@@ -1,0 +1,5 @@
+<div class="current-position" *ngIf="pos$ | async as p">
+  <app-lat-lng *ngIf="p; else none" [lat]="p.lat" [lng]="p.lng" format="1.6-6" />
+  <ng-template #none><span class="placeholder"></span></ng-template>
+</div>
+

@@ -1,0 +1,51 @@
+<div class="map-root">
+  <div id="map" class="map"></div>
+
+  <!-- Top-center HUD: title only -->
+  <div class="hud hud-tc">
+    <app-title-badge text="Map TOOLs V1"></app-title-badge>
+    <app-current-position />
+    <app-current-address />
+  </div>
+
+  <!-- Bottom-right HUD: controls -->
+  <div class="hud hud-br">
+    <app-map-controls
+      [running]="running()"
+      [hasRoute]="hasRoute()"
+      [showStart]="showStart()"
+      [speedKmH]="speedKmH()"
+      [follow]="follow()"
+      [busy]="busy"
+      (stop)="onStop()"
+      (start)="onStart()"
+      (clear)="onClear()"
+      (toggleFollow)="onToggleFollow()"
+      (speedChange)="onSpeedChange($event)"
+    />
+  </div>
+
+  <!-- Top-right HUD: lat/lng + address while moving -->
+  @if (running()) {
+    @if (hudLatLng(); as p) {
+      <div class="hud hud-tr">
+        <div class="panel">
+        <div class="line">
+          <app-lat-lng [lat]="p.lat" [lng]="p.lng" format="1.6-6" />
+        </div>
+          @if (startAddress()) { <div class="line addr">出発: {{ startAddress() }}</div> }
+          @if (endAddress()) { <div class="line addr">到着: {{ endAddress() }}</div> }
+          @if (totalMeters() > 0) { <div class="line">距離: {{ (totalMeters() / 1000) | number: '1.2-2' }} km</div> }
+          @if (etaJst()) { <div class="line eta">ETA(日本時間): {{ etaJst() }}</div> }
+        </div>
+      </div>
+    }
+  }
+
+  <!-- Notice (bottom center) -->
+  @if (notice()) {
+    <div class="notice">{{ notice() }}</div>
+  }
+
+  <div class="hint" *ngIf="!hasRoute() && !running()">地図を2点クリックするとルート探索します</div>
+</div>

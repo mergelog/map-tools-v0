@@ -1,0 +1,5 @@
+<div class="current-address" *ngIf="address$ | async as addr">
+  <span *ngIf="addr; else empty">{{ addr }}</span>
+  <ng-template #empty><span class="placeholder"></span></ng-template>
+</div>
+

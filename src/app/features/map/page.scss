@@ -1,0 +1,168 @@
+/* 全画面地図用のコンテナ（Leafletマップの土台） */
+.map-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Leafletマップ本体を全面配置 */
+.map {
+  position: absolute;
+  inset: 0;
+}
+
+/* 画面上に重ねるHUD（共通設定） */
+.hud {
+  position: absolute;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  z-index: 5000;
+  user-select: none;
+}
+
+/* 左上HUD（現在は未使用） */
+.hud-tl {
+  top: 12px;
+  left: 12px;
+}
+
+/* 右下HUD（操作ボタン・速度・OSM帰属） */
+.hud-br {
+  right: 12px;
+  bottom: 12px;
+  flex-direction: column;
+}
+
+/* 右上HUD（緯度経度・住所・距離・ETAパネル） */
+.hud-tr {
+  right: 12px;
+  top: 12px;
+}
+
+/* 上中央HUD（タイトル） */
+.hud-tc {
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+/* タイトルバッジ */
+.title {
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+/* 速度スライダー（20〜100km/h） */
+.speed-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.speed-control input[type='range'] {
+  width: 180px;
+}
+
+/* OSM帰属表示（HUD内に統合） */
+.osm-attr {
+  margin-top: 6px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* ボタンのアクティブ状態（例: follow ON） */
+.buttons button.active {
+  background: #1976d2;
+  color: #fff;
+  border-color: #1976d2;
+}
+.osm-attr a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+/* 右上の情報パネル（緯度経度・住所・距離・ETA） */
+.panel {
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  padding: 8px 10px;
+  border-radius: 6px;
+  min-width: 240px;
+  max-width: 420px;
+}
+
+.panel .line {
+  line-height: 1.4;
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.panel .addr {
+  margin-top: 4px;
+}
+
+/* ボタンの間隔 */
+.buttons button {
+  margin-right: 6px;
+}
+
+/* 初期ガイドのヒントメッセージ */
+.hint {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  z-index: 5000;
+}
+
+/* 下部中央の簡易通知 */
+.notice {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(244, 67, 54, 0.9); /* error-like */
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  z-index: 6000;
+  font-size: 13px;
+}
+
+/* Leafletデフォルトの帰属（現在は使用しないが残しておく） */
+.leaflet-control-attribution {
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(2px);
+}
+
+/* 自作SVGマーカー/車アイコンの基本調整 */
+.marker-icon,
+.car-icon {
+  background: transparent;
+  border: none;
+}
+
+.marker-svg {
+  display: block;
+}
+
+.car-icon .car-inner {
+  transform-origin: center center;
+}

@@ -1,0 +1,15 @@
+.lat-lng {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.lat-lng .label {
+  opacity: 0.9;
+}
+.lat-lng .value {
+  font-variant-numeric: tabular-nums;
+}
+.lat-lng .sep {
+  opacity: 0.7;
+}
+

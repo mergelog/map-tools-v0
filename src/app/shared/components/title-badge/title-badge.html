@@ -1,0 +1,5 @@
+<div class="title-badge" [class.compact]="compact">
+  <ng-content></ng-content>
+  <span *ngIf="!hasProjectedContent">{{ text }}</span>
+</div>
+

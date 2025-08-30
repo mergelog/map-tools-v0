@@ -1,0 +1,12 @@
+.current-position {
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.current-position .placeholder {
+  display: inline-block;
+  min-width: 8ch;
+  opacity: 0.6;
+}
+

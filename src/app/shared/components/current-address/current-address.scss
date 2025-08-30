@@ -1,0 +1,14 @@
+.current-address {
+  margin-top: 6px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 4px 8px;
+  border-radius: 6px;
+  max-width: 80vw;
+}
+.current-address .placeholder {
+  display: inline-block;
+  min-width: 8ch;
+  opacity: 0.6;
+}
+

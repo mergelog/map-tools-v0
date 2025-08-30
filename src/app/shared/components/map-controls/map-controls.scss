@@ -1,0 +1,44 @@
+.speed-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.speed-control input[type='range'] {
+  width: 180px;
+}
+
+.osm-attr {
+  margin-top: 6px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.9);
+}
+.osm-attr a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.buttons button.active {
+  background: #1976d2;
+  color: #fff;
+  border-color: #1976d2;
+}
+
+/* ボタンのみ2.5倍に拡大（range等への影響を避ける） */
+.buttons button {
+  font-size: 150%;
+  padding: 0.25em 0.5em;
+  line-height: 1.2;
+  /* 隣接要素との余白は .buttons の gap で管理 */
+}
+.buttons {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px; /* 行間・列間の余白 */
+}
